@@ -1,0 +1,60 @@
+# 날짜도감 웹을 GitHub Pages에 올린다. 매주 월요일 새벽 3시(한국 시간)에 위키백과 자료를 새로 받아 다시 만든다.
+# 이 파일은 웹 저장소(web 폴더만 올린 공개 저장소)의 .github/workflows/에 둔다.
+# 저장소 설정 > Secrets and variables > Actions > Variables:
+#   SITE_URL      예: https://kwanghyeon-cpu.github.io/datebook  (canonical·sitemap에 쓴다)
+#   WIKI_CONTACT  위키미디어 User-Agent에 넣는 연락처(이메일)
+name: 날짜도감 웹
+
+on:
+  schedule:
+    - cron: "0 18 * * 0"   # UTC 일요일 18:00 = 한국 월요일 03:00
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test test/*.test.mjs
+      # 지난주 자료를 먼저 깔아 둔다. 이번 주에 못 받은 날짜는 지난주 자료로 만든다.
+      - uses: actions/cache@v4
+        with:
+          path: data
+          key: wiki-data-${{ github.run_id }}
+          restore-keys: wiki-data-
+      - name: 위키백과 날짜 문서 받기
+        run: node scripts/fetch.mjs || echo "일부 날짜를 받지 못했습니다(지난 자료로 만듭니다)."
+        env:
+          WIKI_CONTACT: ${{ vars.WIKI_CONTACT }}
+      - name: 사이트 만들기
+        run: node scripts/build.mjs
+        env:
+          SITE_URL: ${{ vars.SITE_URL }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

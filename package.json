@@ -1,0 +1,14 @@
+{
+  "name": "datebook-web",
+  "private": true,
+  "description": "날짜도감 웹: 한국어 위키백과 날짜 문서 366개로 만드는 정적 사이트",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "fetch": "node scripts/fetch.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/build.mjs --partial && node scripts/serve.mjs",
+    "serve": "node scripts/serve.mjs"
+  }
+}
