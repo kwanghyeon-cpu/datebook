@@ -70,6 +70,44 @@ ${body}
 `;
 }
 
+// ── 함께 쓰면 좋은 앱 ──
+// KH Company 앱끼리 서로 소개하는 목록(https://kwanghyeon-cpu.github.io/related-apps.json, 관리: 포트폴리오 저장소).
+// 만들 때 한 번 받고, 받지 못하면 site/related-apps.json 사본을 쓴다. 웹에서는 설치 여부를 알 수 없어
+// Play에 공개된 앱은 Play 스토어로, 아니면 웹 주소로, 둘 다 없으면 뺀다.
+const SELF_ID = "birthdaytwin";
+async function loadRelated() {
+    let json;
+    try {
+        const res = await fetch("https://kwanghyeon-cpu.github.io/related-apps.json", { signal: AbortSignal.timeout(10000) });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        json = await res.json();
+    } catch (e) {
+        console.warn(`형제 앱 목록을 받지 못해 사본을 씁니다: ${e.message}`);
+        json = JSON.parse(readFileSync(join(web, "site/related-apps.json"), "utf8"));
+    }
+    const ids = [...new Set(json.groups.filter((g) => g.apps.includes(SELF_ID)).flatMap((g) => g.apps).filter((id) => id !== SELF_ID))];
+    return ids.map((id) => ({ id, ...json.apps[id] }))
+        .map((app) => ({ ...app, href: app.public && app.package ? `https://play.google.com/store/apps/details?id=${app.package}` : app.web }))
+        .filter((app) => app.name && app.href);
+}
+
+function relatedBlock() {
+    if (!related.length) return "";
+    return `<aside class="related" aria-labelledby="related-title">
+  <h2 id="related-title">${icon("tabler-apps")}함께 쓰면 좋은 앱</h2>
+  <ul>${related.map((app) => `<li><a href="${esc(app.href)}" rel="noopener">
+    <span class="related-icon">${app.icon ? `<img src="${esc(app.icon)}" alt="" loading="lazy" width="48" height="48">` : icon("tabler-apps")}</span>
+    <span><b>${esc(app.name)}</b><span>${esc(app.tagline)}</span></span></a></li>`).join("")}</ul>
+</aside>`;
+}
+
+/** 생일 결과 아래 한 줄(내 생일이 이 날짜일 때만 app.mjs가 보여 준다). */
+function fortuneLink() {
+    const app = related.find((a) => a.id === "trifortune");
+    if (!app) return "";
+    return `<a class="fortune" id="fortune" href="${esc(app.href)}" rel="noopener" hidden>${icon("tabler-crystal-ball")}이 생일로 운세 보기 · ${esc(app.name)}${icon("tabler-chevron-right")}</a>`;
+}
+
 function appCta() {
     return `<aside class="card warm app-cta">
   <div class="appicon">${icon("mdi-calendar-star")}</div>
@@ -127,6 +165,7 @@ function dayPage(info, prev, next) {
   <h1>${label(month, day)}</h1>
   <p class="lede">이날 태어난 사람 ${info.births.length}명 · 떠난 사람 ${info.deaths.length}명 · 역사 ${info.events.length}가지 · 기념일 ${info.holidays.length}개</p>
   <div class="card warm mine" id="mine" hidden></div>
+  ${fortuneLink()}
   <form class="card ask" id="ask" hidden>
     <label class="field" for="ask-year">${label(month, day)}에 태어났다면, 태어난 해
       <input id="ask-year" name="year" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="1990" autocomplete="bday-year"></label>
@@ -175,6 +214,7 @@ function dayPage(info, prev, next) {
 </section>
 
 ${appCta()}
+${relatedBlock()}
 </main>`;
     return layout({ root: "../", path: `${key(month, day)}/`, title, description, body, page: "day", month, day });
 }
@@ -231,6 +271,7 @@ function indexPage(dates) {
 <div class="months">${months}</div>
 
 ${appCta()}
+${relatedBlock()}
 </main>`;
     return layout({
         root: "./", path: "", page: "home",
@@ -241,6 +282,7 @@ ${appCta()}
 }
 
 // ── 만들기 ──
+const related = await loadRelated();
 const dates = allDates();
 const missing = dates.filter(([m, d]) => !existsSync(join(web, "data", key(m, d) + ".json")));
 const partial = process.argv.includes("--partial");

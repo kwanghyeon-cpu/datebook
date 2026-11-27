@@ -203,6 +203,9 @@ function renderMine(month, day) {
     const matches = saved && Number(saved.solar.slice(5, 7)) === month && Number(saved.solar.slice(8, 10)) === day;
     ask.hidden = !!matches;
     mine.hidden = !matches;
+    // 생일 결과를 본 자리에서만 운세 앱으로 이어 준다(build.mjs fortuneLink).
+    const fortune = document.getElementById("fortune");
+    if (fortune) fortune.hidden = !matches;
     if (!matches) {
         if (saved) {
             const [m, d] = [Number(saved.solar.slice(5, 7)), Number(saved.solar.slice(8, 10))];
